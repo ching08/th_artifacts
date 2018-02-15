@@ -1,0 +1,28 @@
+---
+- name: service1
+  repository: hub.gitlab-sj.thalesesec.com/annie.chang/service1
+  tag: master_0.1.0_ce86a
+  chartPath: helm-chart
+  commit_msg: ce86a0b Update .gitlab-ci.yml
+
+- name: inventory
+  repository: hub.gitlab-sj.thalesesec.com/lucy/inventory-service
+  tag: master_0.0.1_0938f
+  chartPath: helm-chart
+
+- name: credentials
+  repository: hub.gitlab-sj.thalesesec.com/lucy/credentials-service
+  tag: master_0.1.0_6e585
+  chartPath: helm-chart
+
+- name: compliance
+  repository: hub.gitlab-sj.thalesesec.com/lucy/compliance-service
+  tag: master_0.1.0_b1b79
+  chartPath: helm-chart
+  commit_msg: b1b795f Merge branch 'feature/FUS-355-NV' into 'master'
+
+- name: rule
+  repository: hub.gitlab-sj.thalesesec.com/lucy/rule-service
+  tag: master_0.0.1_67e73
+  chartPath: helm-chart
+

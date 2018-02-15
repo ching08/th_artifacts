@@ -1,0 +1,33 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+        "LucyRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Principal": {
+                                "Federated": "accounts.google.com"
+                            },
+                            "Effect": "Allow",
+                            "Action": [
+                                "sts:AssumeRoleWithWebIdentity"
+                            ],
+                            "Condition": {
+                                "StringEquals": {
+                                    "accounts.google.com:aud": "808352361729-6kobl8us1g6n86tqbv2r0pf3v2rhgrpv.apps.googleusercontent.com"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+                ],
+                "Path": "/"
+            }
+        }
+    }
+}

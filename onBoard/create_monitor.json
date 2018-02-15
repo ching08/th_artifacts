@@ -1,0 +1,259 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+        "LucyQueue": {
+            "Type": "AWS::SQS::Queue",
+            "Properties": {
+                "QueueName": "LucySQS"
+            }
+        },
+        "LucyQueuePolicy": {
+            "DependsOn": [
+                "LucyQueue",
+                "LucyEventRule"
+            ],
+            "Type": "AWS::SQS::QueuePolicy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Id": "LucyQueuePolicy",
+                    "Statement": [
+                        {
+                            "Sid": "AWS_Lucy_event",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "*"
+                            },
+                            "Action": "sqs:SendMessage",
+                            "Resource": {
+                                "Fn::GetAtt": [
+                                    "LucyQueue",
+                                    "Arn"
+                                ]
+                            },
+                            "Condition": {
+                                "ArnEquals": {
+                                    "aws:SourceArn": {
+                                        "Fn::GetAtt": [
+                                            "LucyEventRule",
+                                            "Arn"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "Queues": [
+                    {
+                        "Ref": "LucyQueue"
+                    }
+                ]
+            }
+        },
+        "LucyEventRule": {
+            "DependsOn": [
+                "LucyQueue"
+            ],
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+                "Description": "LucyEventRule",
+                "EventPattern": {
+                    "source": [
+                        "aws.s3"
+                    ],
+                    "detail-type": [
+                        "AWS API Call via CloudTrail"
+                    ],
+                    "detail": {
+                        "eventSource": [
+                            "s3.amazonaws.com"
+                        ],
+                        "eventName": [
+                            "PutObject",
+                            "UploadPart",
+                            "CreateMultipartUpload"
+                        ]
+                    }
+                },
+                "State": "ENABLED",
+                "Targets": [
+                    {
+                        "Arn": {
+                            "Fn::GetAtt": [
+                                "LucyQueue",
+                                "Arn"
+                            ]
+                        },
+                        "Id": "lucy_event1"
+                    }
+                ]
+            }
+        },
+        "LucyTrailBucket": {
+            "DeletionPolicy": "Retain",
+            "Type": "AWS::S3::Bucket",
+            "Properties": {}
+        },
+        "BucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+                "Bucket": {
+                    "Ref": "LucyTrailBucket"
+                },
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "AWSCloudTrailAclCheck",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "cloudtrail.amazonaws.com"
+                            },
+                            "Action": "s3:GetBucketAcl",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:s3:::",
+                                        {
+                                            "Ref": "LucyTrailBucket"
+                                        }
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Sid": "AWSCloudTrailWrite",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "cloudtrail.amazonaws.com"
+                            },
+                            "Action": "s3:PutObject",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:s3:::",
+                                        {
+                                            "Ref": "LucyTrailBucket"
+                                        },
+                                        "/AWSLogs/",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        "/*"
+                                    ]
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "s3:x-amz-acl": "bucket-owner-full-control"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "LucyLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": "LucyLogs",
+                "RetentionInDays": 7
+            }
+        },
+        "LucyLogGroupRole": {
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "cloudtrail.amazonaws.com"
+                            },
+                            "Sid": "AssumeRole1"
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Policies": [
+                    {
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Action": "logs:CreateLogStream",
+                                    "Effect": "Allow",
+                                    "Resource": {
+                                        "Fn::GetAtt": [
+                                            "LucyLogGroup",
+                                            "Arn"
+                                        ]
+                                    },
+                                    "Sid": "AWSCloudTrailCreateLogStream2014110"
+                                },
+                                {
+                                    "Action": "logs:PutLogEvents",
+                                    "Effect": "Allow",
+                                    "Resource": {
+                                        "Fn::GetAtt": [
+                                            "LucyLogGroup",
+                                            "Arn"
+                                        ]
+                                    },
+                                    "Sid": "AWSCloudTrailPutLogEvents20141101"
+                                }
+                            ],
+                            "Version": "2012-10-17"
+                        },
+                        "PolicyName": "Lucycloudtrail-policy"
+                    }
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "LucyTrail": {
+            "DependsOn": [
+                "BucketPolicy",
+                "LucyQueuePolicy"
+            ],
+            "Type": "AWS::CloudTrail::Trail",
+            "Properties": {
+                "TrailName": "LucyTrail",
+                "S3BucketName": {
+                    "Ref": "LucyTrailBucket"
+                },
+                "IsLogging": true,
+                "IncludeGlobalServiceEvents": true,
+                "IsMultiRegionTrail": true,
+                "CloudWatchLogsLogGroupArn": {
+                    "Fn::GetAtt": [
+                        "LucyLogGroup",
+                        "Arn"
+                    ]
+                },
+                "CloudWatchLogsRoleArn": {
+                    "Fn::GetAtt": [
+                        "LucyLogGroupRole",
+                        "Arn"
+                    ]
+                },
+                "EventSelectors": [
+                    {
+                        "DataResources": [
+                            {
+                                "Type": "AWS::S3::Object",
+                                "Values": [
+                                    "arn:aws:s3:::"
+                                ]
+                            }
+                        ],
+                        "IncludeManagementEvents": false,
+                        "ReadWriteType": "WriteOnly"
+                    }
+                ]
+            }
+        }
+    }
+}
